@@ -36,3 +36,8 @@ CUDA_VISIBLE_DEVICES=3 python knn_lm.py --split train --dataset anli \
 	  --model_id roberta-base --dstore_path /data/yingting/Dataset/anli/dstore/ \
     --layer_id $layer_id --adapter_path ./save/saved_adapters_anli --num_labels 3 --use_adapter --create_dstore True 
 ```
+### or can use .sh file
+```python
+# anli example
+bash tasks/anli/run_anli.sh
+```
