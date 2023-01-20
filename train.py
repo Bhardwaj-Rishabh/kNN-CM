@@ -24,7 +24,7 @@ set_seed(1234)
 import random
 random.seed(4)
 
-SUPERGLUE = {"cb", "rte", "boolq", "wic", "wsc", "copa", "record", "multirc"}
+SUPERGLUE = {"rte", "boolq", "wic", "wsc"}
 
 
 def get_args():
@@ -89,35 +89,12 @@ def cb_encode_batch(batch):
 	return {"input_ids": outputs,
 			"labels": batch["labels"]}
 
-def qasc_preprocess_function(batch):
-
-	results = {
-		"input_ids": list(),
-		"attention_mask": list(),
-		"labels": list(),
-	}
-
-	for idx, question in enumerate(batch["question"]):
-		choices, choices_labels, answerkeys = batch["choices"][idx]["text"], batch["choices"][idx]["label"], batch["answerKey"][idx]
-
-		for choi_idx, choi in enumerate(choices):
-
-			result = tokenizer(question, choi, max_length=30, truncation=True, padding="max_length")
-
-			label = 1 if choices_labels[choi_idx] in answerkeys else 0
-
-			results["input_ids"].append(result["input_ids"])
-			results["attention_mask"].append(result["attention_mask"])
-			results["labels"].append(label)
-	
-	return results
-
 
 def get_dataset(data_name, tokenizer, args):
 
 	if data_name == "rotten_tomatoes":
 
-		dataset = load_dataset("rotten_tomatoes", cache_dir="/data/yingting/Dataset/rotten_tomatoes/")
+		dataset = load_dataset("rotten_tomatoes", cache_dir="./Dataset/rotten_tomatoes/")
 		dataset = dataset.rename_column("label", "labels")
 
 		num_of_labels = 2
@@ -130,7 +107,7 @@ def get_dataset(data_name, tokenizer, args):
 
 	elif data_name == "trec":
 
-		dataset = load_dataset("trec", cache_dir="/data/yingting/Dataset/trec/")
+		dataset = load_dataset("trec", cache_dir="./Dataset/trec/")
 		dataset['train'] = dataset['train'].shuffle(seed=42)
 		dataset_tr_valid = dataset['train'].train_test_split(test_size=0.1, shuffle=True, seed=100)
 		dataset['train'] = dataset_tr_valid['train']
@@ -147,7 +124,7 @@ def get_dataset(data_name, tokenizer, args):
 
 	elif data_name == "anli3":
 
-		dataset = load_dataset("anli", split=["train_r3","dev_r3","test_r3"], cache_dir="/data/yingting/Dataset/anli/")
+		dataset = load_dataset("anli", split=["train_r3","dev_r3","test_r3"], cache_dir="./Dataset/anli/")
 		dataset[0] = dataset[0].rename_column("label", "labels")
 		dataset[1] = dataset[1].rename_column("label", "labels")
 		dataset[2] = dataset[2].rename_column("label", "labels")
@@ -169,7 +146,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : dataset[2]}
 
 	elif data_name == "anli1":
-		dataset = load_dataset("anli", split=["train_r1","dev_r1","test_r1"], cache_dir="/data/yingting/Dataset/anli1/")
+		dataset = load_dataset("anli", split=["train_r1","dev_r1","test_r1"], cache_dir="./Dataset/anli1/")
 		dataset[0] = dataset[0].rename_column("label", "labels")
 		dataset[1] = dataset[1].rename_column("label", "labels")
 		dataset[2] = dataset[2].rename_column("label", "labels")
@@ -192,7 +169,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : dataset[2]}
 
 	elif data_name == "anli2":
-		dataset = load_dataset("anli", split=["train_r2","dev_r2","test_r2"], cache_dir="/data/yingting/Dataset/anli2/")
+		dataset = load_dataset("anli", split=["train_r2","dev_r2","test_r2"], cache_dir="./Dataset/anli2/")
 		dataset[0] = dataset[0].rename_column("label", "labels")
 		dataset[1] = dataset[1].rename_column("label", "labels")
 		dataset[2] = dataset[2].rename_column("label", "labels")
@@ -218,7 +195,7 @@ def get_dataset(data_name, tokenizer, args):
 		num_of_labels = 3
 		id_2_label={0:"0", 1:"1", 2:"2"}
 
-		dataset = load_dataset("anli", cache_dir="/data/yingting/Dataset/anli/")
+		dataset = load_dataset("anli", cache_dir="./Dataset/anli/")
 		dataset = dataset.rename_column("label", "labels")
 		
 		dataset = dataset.map(anli_encode_batch, batched=True, remove_columns=dataset["train_r2"].column_names)
@@ -233,7 +210,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : anli_test_dataset}
     
 	elif data_name == "restaurant":
-		data_path = "/data/yingting/Dataset/RLDS"
+		data_path = "./Dataset/RLDS"
 		r_train_v2 = "Restaurants_Train_v2.csv"
 		restaurant_file = join(data_path, r_train_v2)
 
@@ -249,7 +226,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : test_dataset}
 
 	elif data_name == "laptop":
-		data_path = "/data/yingting/Dataset/RLDS"
+		data_path = "./Dataset/RLDS"
 		l_train_v2 = "Laptop_Train_v2.csv"
 		laptop_file = join(data_path, l_train_v2)
 
@@ -265,7 +242,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : test_dataset}
 
 	elif data_name == "device":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		num_of_labels = 2
 		id_2_label={0:"NEG", 1:"POS"}
@@ -279,7 +256,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : test_dataset}
 
 	elif data_name == "service":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		num_of_labels = 3
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
@@ -293,7 +270,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : test_dataset}
 
 	elif data_name == "rest":   # restaurant in different split
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		num_of_labels = 3
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
@@ -307,7 +284,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : test_dataset}
 
 	elif data_name == "new_laptop":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		num_of_labels = 3
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
@@ -327,13 +304,11 @@ def get_dataset(data_name, tokenizer, args):
 		else:
 			id_2_label = dataset.id2label
 
-		'''
 	elif data_name == "cb":
-		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		# test_dataset = load_dataset('super_glue', 'cb', split='test', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		# valid_dataset = None
-		test_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="/data/yingting/Dataset/super_glue/cb/")
+		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="./Dataset/super_glue/cb/")
+		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="./Dataset/super_glue/cb/")
+		# test_dataset = load_dataset('super_glue', 'cb', split='test', cache_dir="./Dataset/super_glue/cb/")
+		test_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="./Dataset/super_glue/cb/")
 		
 		train_dataset = train_dataset.rename_column("label", "labels")
 		valid_dataset = valid_dataset.rename_column("label", "labels")
@@ -355,46 +330,6 @@ def get_dataset(data_name, tokenizer, args):
 		dataset = {"train" : train_dataset,
 				"validation" : valid_dataset,
 				"test" : test_dataset}
-	elif data_name == "rte":
-
-		train_dataset = load_dataset('super_glue', 'rte', split='train', cache_dir="/data/yingting/Dataset/super_glue/rte/")
-		valid_dataset = load_dataset('super_glue', 'rte', split='validation', cache_dir="/data/yingting/Dataset/super_glue/rte/")
-		test_dataset = load_dataset('super_glue', 'rte', split='validation', cache_dir="/data/yingting/Dataset/super_glue/rte/")
-
-		train_dataset = train_dataset.rename_column("label", "labels")
-		valid_dataset = valid_dataset.rename_column("label", "labels")
-		test_dataset  = test_dataset.rename_column("label", "labels")
-
-		num_of_labels = 2
-		id_2_label={0:"0", 1:"1"}
-
-		# Encode the input data
-		train_dataset = train_dataset.map(cb_encode_batch, batched=True, remove_columns=train_dataset.column_names)
-		valid_dataset = valid_dataset.map(cb_encode_batch, batched=True, remove_columns=valid_dataset.column_names)
-		test_dataset  = test_dataset.map(cb_encode_batch, batched=True, remove_columns=test_dataset.column_names)
-
-		# Transform to pytorch tensors and only output the required columns
-		train_dataset.set_format(type="torch", columns=["input_ids",  "labels"])
-		valid_dataset.set_format(type="torch", columns=["input_ids",  "labels"])
-		test_dataset.set_format(type="torch", columns=["input_ids",  "labels"])
-
-		dataset = {"train" : train_dataset,
-				"validation" : valid_dataset,
-				"test" : test_dataset} 
-	
-	elif data_name =="qasc":
-		dataset = load_dataset("qasc", cache_dir="/data/yingting/Dataset/qasc/")
-
-		num_of_labels = 2
-		id_2_label={ 0: "False", 1: "True"}
-
-		# Encode the input data
-		dataset = dataset.map(qasc_preprocess_function, 
-				batched=True, 
-				remove_columns=dataset["train"].column_names,
-				desc="Running tokenizer on dataset")
-		# Transform to pytorch tensors and only output the required columns
-		dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"]) '''
 	else:
 		raise NotImplementedError
 
@@ -463,8 +398,6 @@ if __name__ == "__main__":
 		logging_dir=log_path,
 		# The next line is important to ensure the dataset labels are properly passed to the model
 		remove_unused_columns=False,
-		#changed
-		# remove_unused_columns=True,
 	)
 
 	#### Dataset
@@ -538,135 +471,20 @@ if __name__ == "__main__":
 	trainer = AdapterTrainer(
 		model=model,
 		args=training_args,
-		# train_dataset=dataset["train"],
-		# eval_dataset=dataset["validation"],
-		#############
 		train_dataset=train_dataset,
 		eval_dataset=valid_dataset,
-		# compute_metrics=dataset.compute_metrics,
 		tokenizer=tokenizer,
-        # data_collator=dataset.data_collator,
-		###############3
 		data_collator=data_collator,
 		compute_metrics=compute_metrics,
-		# compute_metrics=compute_macro_f1,
 		callbacks = [EarlyStoppingCallback(early_stopping_patience = 5)]
-		# callbacks = [TensorBoardCallback]
 	)
 
-	do_train = True
-	do_test = False
-	if do_train:
-		trainer.train()
-		valid_metric = trainer.evaluate()
+	
+	trainer.train()
+	valid_metric = trainer.evaluate()
 
-		print(valid_metric)
-		# print(trainer.predict(dataset["test"]).metrics)
-		print(trainer.predict(test_dataset).metrics)
-		model.save_adapter(args.save_adapter_path, args.dataset)
+	print(valid_metric)
+	print(trainer.predict(test_dataset).metrics)
+	model.save_adapter(args.save_adapter_path, args.dataset)
 
-	if do_test:
-		from knn_lm import get_test_acc, faiss_read, create_datastore
-		device = trainer.model.device
-		trainer.model.load_adapter(args.save_adapter_path)
-		trainer.model.to(device)
-		# print(trainer.predict(dataset["test"]).metrics)
-
-		'''Load pre-trained language model'''
-		newmodel = RobertaModelWithHeads.from_pretrained("roberta-base", output_hidden_states=True, )
-
-		if True:
-			print("\n\n\tLoading adapter...\n")
-			newmodel.load_adapter(f"{args.save_adapter_path}")
-			# model.set_active_adapters(f"{args.dataset}") # to deactivate use model.set_active_adapters(None)
-			newmodel.set_active_adapters(str(args.dataset.lower().split("2")[0]))
-
-		newmodel.to(device)
-
-		print("------->>>>>>>>>>>>>> train:", trainer.evaluate())
-
-		print("------->>>>>>>>>>>>>> test :", trainer.predict(test_dataset).metrics)
-
-		# metric = load_metric("accuracy")
-		# compute_metrics=metric #dataset.metric 
-		# model = newmodel
-
-		# lm_logits = []
-		# y_pred = []
-		# y_true = []
-		# for i, data in enumerate(test_dataset):
-		# 	input_ids = test_dataset[i]['input_ids'].clone().detach().view(1,-1).to(model.device)
-		# 	target_ids = test_dataset[i]['labels'].clone().detach().view(-1).to(model.device)
-		# 	if "attention_mask" in data.keys():
-		# 		attention_mask = data["attention_mask"].to(model.device)
-		# 	else:
-		# 		attention_mask = None
-
-		# 	with torch.no_grad():
-		# 		#obtain context context representations
-		# 		if args.dataset == "copa":
-		# 			input_ids = input_ids.view(-1, args.max_seq_length)
-		# 		lm_output = model(input_ids, attention_mask, labels=target_ids)
-		# 		logits = torch.softmax(lm_output.logits, dim=-1)
-		# 		lm_logit = logits.detach().cpu().numpy()
-		# 		lm_logits.extend(lm_logit)
-
-		# 		y_lm_pred = torch.argmax(logits, dim=-1).cpu().tolist()
-		# 		y_true.append(target_ids.squeeze(0).cpu().tolist())
-		# 		y_pred.append(y_lm_pred)
-		# 		print("===============================")
-		# 		print("input_ids     : ", input_ids)
-		# 		print("attention_mask: ", attention_mask)
-		# 		print("target_ids    : ", target_ids)
-		# 		print("y_true        : ", y_true)
-		# 		print("y_pred        : ", y_pred)
-		# 		exit()
-
-		# acc = compute_accuracy_test(predictions=lm_logits, references=y_true)
-		# print(acc)
-		# exit()
-
-		# model.eval()
-		# lm_logits = []
-		# y_pred = []
-		# y_true = []
-		# for data in test_dataset:
-		# 	input_ids = data["input_ids"].to(model.device)
-		# 	if "attention_mask" in data.keys():
-		# 		attention_mask = data["attention_mask"].to(model.device)
-		# 	else:
-		# 		attention_mask = None
-		# 	label = data["labels"]
-		
-		# 	lm_output = model(input_ids=input_ids, attention_mask=attention_mask, label=label)
-
-		# 	logits = torch.softmax(lm_output.logits, dim=-1)
-
-		# 	lm_logit = logits.detach().cpu().numpy()
-		# 	lm_logits.append(lm_logit)
-		# 	y_pred.append(torch.argmax(logits, dim=-1).cpu().tolist())
-		# 	y_true.append([label])
-
-		# lm_acc = compute_accuracy_knnlm(y_true, lm_logits)
-		# y_pred = np.array(y_pred).squeeze()
-		# y_true = np.array(y_true).squeeze()
-		# train_acc = compute_metrics.compute(predictions=y_pred, references=y_true)
-		# print("lm-only acc:", lm_acc)
-		# print("train_acc:", train_acc)
-		# exit()
-
-		create_datastore(args, num_samples=len(train_dataset), train_datasets=train_dataset, model=trainer.model)
-
-		index = faiss_read(args.dataset, 11)
-
-		# get_test_acc(args, test_dataset, index, 10, 1e-3, 1, 2, newmodel)
-		get_test_acc(args, test_dataset, index, 4, trainer.model)
-
-	# trainer.save_model("./training_output/best_model")
-	# trainer.model.config.to_json_file("./training_output/best_model/rotten_tomatoes/config.json")
-
-	# classifier = TextClassificationPipeline(model=model, tokenizer=tokenizer, device=training_args.device.index)
-
-	# print("-----------------------")
-	# classifier("This is awesome!")
-
+	

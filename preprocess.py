@@ -63,25 +63,11 @@ class RLDSDataset(Dataset):
 
 		outputs = self.tokenizer(new_sentence, max_length=self.max_length, truncation=True, padding="max_length")
 
-		#changed
+		
 		return {"input_ids": torch.tensor(outputs["input_ids"]),
 				"attention_mask": torch.tensor(outputs["attention_mask"]),
 				"labels": torch.tensor(self.label_2_id[sample["polarity"]])}
 		
-
-		# input_ids = self.tokenizer.encode(
-		# 							# text=sample["sentence"], 
-		# 							text=sample["aspect_term"], 
-		# 							text_pair=new_sentence,
-		# 							max_length=self.max_length,
-		# 							truncation=True,
-		# 							padding="max_length",
-		# 							add_special_tokens=True)
-
-		
-
-		# return {"input_ids": input_ids,
-		# 		"labels": self.label_2_id[sample["polarity"]]}
 
 def ot2bio_ote(ote_tag_sequence):
 	"""

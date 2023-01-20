@@ -2,29 +2,21 @@ import torch
 from datasets import load_dataset, load_metric
 import numpy as np
 from transformers import set_seed, TrainingArguments, AdapterTrainer, EvalPrediction
-from transformers import RobertaTokenizer, RobertaConfig, RobertaForSequenceClassification, RobertaModelWithHeads
-from transformers import TextClassificationPipeline
+from transformers import RobertaTokenizer, RobertaConfig, RobertaModelWithHeads
 
 from os.path import join
-from torch.utils.data import DataLoader
 
 import argparse
-from transformers.integrations import TensorBoardCallback
 from transformers import EarlyStoppingCallback, default_data_collator
 import logging
 logging.disable(logging.WARNING)
 
-from preprocess import RLDSDataset, DLRSDataset
 from sklearn.metrics import precision_recall_fscore_support
-
-from preprocess import SuperGlueDataset
 
 set_seed(1234)
 
 import random
 random.seed(4)
-
-SUPERGLUE = {"cb", "rte", "boolq", "wic", "wsc", "copa", "record", "multirc"}
 
 
 def get_args():
@@ -120,7 +112,7 @@ def get_dataset(data_name, tokenizer, args):
 		num_of_labels = 3
 		id_2_label={0:"0", 1:"1", 2:"2"}
 
-		dataset = load_dataset("anli", cache_dir="/data/yingting/Dataset/anli/")
+		dataset = load_dataset("anli", cache_dir="./Dataset/anli/")
 		dataset = dataset.rename_column("label", "labels")
 		
 		dataset = dataset.map(anli_encode_batch, batched=True, remove_columns=dataset["train_r2"].column_names)
@@ -215,8 +207,6 @@ if __name__ == "__main__":
 		logging_dir=log_path,
 		# The next line is important to ensure the dataset labels are properly passed to the model
 		remove_unused_columns=False,
-		#changed
-		# remove_unused_columns=True,
 	)
 
 	#### Dataset
@@ -278,27 +268,18 @@ if __name__ == "__main__":
 	trainer = AdapterTrainer(
 		model=model,
 		args=training_args,
-		# train_dataset=dataset["train"],
-		# eval_dataset=dataset["validation"],
-		#############
 		train_dataset=train_dataset,
 		eval_dataset=valid_dataset,
-		# compute_metrics=dataset.compute_metrics,
 		tokenizer=tokenizer,
-        # data_collator=dataset.data_collator,
-		###############3
 		data_collator=data_collator,
 		compute_metrics=compute_metrics,
-		# compute_metrics=compute_macro_f1,
 		callbacks = [EarlyStoppingCallback(early_stopping_patience = 5)]
-		# callbacks = [TensorBoardCallback]
 	)
 	
 	trainer.train()
 	valid_metric = trainer.evaluate()
 
 	print(valid_metric)
-	# print(trainer.predict(dataset["test"]).metrics)
 	print(trainer.predict(test_dataset).metrics)
 	model.save_adapter(args.save_adapter_path, args.dataset)
 

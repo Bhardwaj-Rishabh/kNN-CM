@@ -1,23 +1,15 @@
-#[script to construct datastores]
-
 import os
-import sys
 import time
-import itertools
 import numpy as np
 
 import torch
 from tqdm import tqdm
-# from transformers import GPT2LMHeadModel, GPT2TokenizerFast
-from transformers import set_seed, RobertaTokenizer, RobertaConfig, RobertaModelWithHeads, RobertaForSequenceClassification
+from transformers import set_seed, RobertaTokenizer, RobertaModelWithHeads
 
 import faiss
 import psutil
 
-from datasets import Dataset
 from datasets import load_dataset, load_metric
-from datasets import load_from_disk
-from datasets import concatenate_datasets
 
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_recall_fscore_support
@@ -30,12 +22,11 @@ from preprocess import RLDSDataset, DLRSDataset, SuperGlueDataset
 
 import pickle as pk
 
-# set_seed(1314)
 set_seed(1234)
 import random
 random.seed(4)
 
-SUPERGLUE = {"cb", "rte", "boolq", "wic", "wsc", "copa", "record", "multirc"}
+SUPERGLUE = {"rte", "boolq", "wic", "wsc"}
 
 
 def get_args():
@@ -120,8 +111,6 @@ def get_activation(name):
 		activation[name] = output.detach()
 	return hook
 
-# def create_datastore(num_samples, hidden_dim, dstore_path, dataset_name, model, device):
-from scipy.special import softmax
 def create_datastore(args, num_samples, train_datasets, model):
 	'''Allocate datastore memory'''	
 	dstore_filename = args.dstore_path + args.dataset + "_dstore_" + str(args.layer_id)
@@ -274,8 +263,8 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 		hidden_dim = model.config.hidden_size
 
 	dstore_filename = args.dstore_path + args.dataset + "_dstore_" + str(args.layer_id)
-	dstore_keys = np.memmap(dstore_filename + '_key_test.npy', dtype=np.float16, mode='w+', shape=(num_samples, hidden_dim))
-	dstore_vals_label = np.memmap(dstore_filename + '_val_test_label.npy', dtype=np.int32, mode='w+', shape=(num_samples, 1))
+	# dstore_keys = np.memmap(dstore_filename + '_key_test.npy', dtype=np.float16, mode='w+', shape=(num_samples, hidden_dim))
+	# dstore_vals_label = np.memmap(dstore_filename + '_val_test_label.npy', dtype=np.int32, mode='w+', shape=(num_samples, 1))
 	
 	train_labels = np.memmap(dstore_filename + '_val.npy', dtype=np.int32, mode='r')
 	# method1
@@ -447,159 +436,6 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 	sorted_result = sorted(results, key=lambda k: k["metrics"], reverse=True)
 	print(sorted_result[:10])
 
-def get_test_acc_(args, test_datasets, index, kl_threshold, lambda_, topn, num_labels, model):
-	y_true = []
-	y_pred = []
-	y_knn_lm_pred = []
-	lm_logits = []
-	knn_logits = []
-	knn_lm_logits = []
-
-	dstore_filename = args.dstore_path + args.dataset + "_dstore_" + str(args.layer_id)
-	# dstore_filename = args.dstore_path + str(args.dataset.lower().split("2")[0]) + "_dstore_" + str(args.layer_id)
-
-	#create datastore
-	num_samples = len(test_datasets)
-	if args.dataset=="copa":
-		hidden_dim = 1536
-	else:
-		hidden_dim = 768
-	# dstore_keys = np.memmap(dstore_filename + '_key_test.npy', dtype=np.float16, mode='w+', shape=(num_samples, hidden_dim))
-	# dstore_vals_label = np.memmap(dstore_filename + '_val_test_label.npy', dtype=np.int32, mode='w+', shape=(num_samples, 1))
-
-	
-	train_labels = np.memmap(dstore_filename + '_val.npy', dtype=np.int32, mode='r')
-	# method1
-	model.roberta.encoder.layer[args.layer_id].attention.output.LayerNorm.register_forward_hook(get_activation(f'roberta.encoder.layer.{args.layer_id}.attention.output.LayerNorm'))
-	# method2
-	# model.roberta.encoder.layer[args.layer_id].output.LayerNorm.register_forward_hook(get_activation('roberta.encoder.layer.{args.layer_id}}.output.LayerNorm'))
-	# method3 
-	# model.roberta.pooler.register_forward_hook(get_activation("roberta.pooler"))
-	# method4
-	# model.heads.anli3[1].register_forward_hook(get_activation("heads.anli3[1]"))
-	# method5
-	# model.heads.anli1[4].register_forward_hook(get_activation("heads.anli1[4]"))
-	# method6
-	# model.heads.anli3[2].register_forward_hook(get_activation("heads.anli3[2]"))
-
-	knn_need_count=0
-	# model.eval()
-	for i, data in enumerate(test_datasets):
-		input_ids = torch.tensor(test_datasets[i]['input_ids']).view(1,-1).to(model.device)
-		# target_ids = torch.tensor(test_datasets[i]['labels']).view(1,-1).to(model.device)
-		target_ids = torch.tensor(test_datasets[i]['labels']).view(-1).to(model.device)
-
-		# input_ids = torch.IntTensor(data["input_ids"]).to(model.device)
-		# if "attention_mask" in data.keys():
-		# 	attention_mask = torch.IntTensor(data["attention_mask"]).to(model.device)
-		# else:
-		# 	attention_mask = None
-		# label = data["labels"]
-
-		with torch.no_grad():
-			#obtain context context representations
-			if args.dataset == "copa":
-				input_ids = input_ids.view(-1, args.max_seq_length)
-			lm_output = model(input_ids, labels=target_ids)
-			logits = torch.softmax(lm_output.logits, dim=-1)
-			lm_logit = logits.detach().cpu().numpy()
-			lm_logits.append(lm_logit)
-		
-			# lm_output = model(input_ids=input_ids, attention_mask=attention_mask, label=label)  
-			# logits = torch.softmax(lm_output.logits, dim=-1)
-			# lm_logit = logits.detach().cpu().numpy()
-			# lm_logits.append(lm_logit)
-
-			# Search the top-k nearest neighbors of all the vectors in embedding
-			# method1
-			if args.dataset == "copa":
-				embedding = activation[f'roberta.encoder.layer.{args.layer_id}.attention.output.LayerNorm'][:,0].reshape(1,-1).squeeze(0).cpu().numpy().astype(np.float16)
-			else:
-				embedding = activation[f'roberta.encoder.layer.{args.layer_id}.attention.output.LayerNorm'].squeeze(0)[0].cpu().numpy().astype(np.float16)
-			# method3 
-			# embedding = activation[f'roberta.pooler'].squeeze(0).cpu().numpy().astype(np.float16)
-			# method4
-			# embedding = activation[f'heads.anli3[1]'].squeeze(0).cpu().numpy().astype(np.float16)
-			# method5
-			# embedding = activation[f'heads.anli1[4]'].squeeze(0).cpu().numpy().astype(np.float16)
-			# embedding = softmax(embedding, axis=-1)
-			# method6
-			# embedding = activation[f'heads.anli3[2]'].squeeze(0).cpu().numpy().astype(np.float16)
-
-			# ##### added for plt
-			# dstore_keys[i, :] = embedding # softmax(embedding, axis=-1)
-			# # dstore_vals_label[i, ] = target_ids.squeeze(0)[0].cpu().numpy().astype(np.intc)
-			# dstore_vals_label[i, ] = target_ids[0].cpu().numpy().astype(np.intc)
-			# #######
-
-			
-			embedding = np.expand_dims(embedding, axis=0)
-			distances, neighbours = index.search(embedding, k=topn)   # shape: (1,4)
-
-			neighbour_labels = []
-			for idx in neighbours[0]:
-				idx = idx.item()
-				lab = train_labels[idx]
-				neighbour_labels.append(lab)
-
-			counter = Counter(neighbour_labels)
-			num_all = len(neighbour_labels)
-			knn_logit = [counter[i]*1.0/num_all for i in range(num_labels)]
-			knn_logit = np.array([knn_logit])
-			knn_logits.append(knn_logit)
-
-			uniform_dis = [1.0/num_labels for i in range(num_labels)]
-			kl_divergence = sum(rel_entr(lm_logit[0], uniform_dis))
-			
-			if kl_divergence < kl_threshold :
-				knn_need_count += 1
-				knn_lm_logit = lambda_ * lm_logit + (1-lambda_) * knn_logit
-			else:
-				knn_lm_logit = lm_logit
-
-			######## format {out = lambda*(p_model) + (1-lamba) *(p_fassi)}
-			# knn_lm_logit = lambda_ * lm_logit + (1-lambda_) * knn_logit
-			knn_lm_logits.append(knn_lm_logit)
-
-			y_lm_pred = torch.argmax(logits, dim=-1).cpu().tolist()
-			y_knnlm_pred = torch.argmax(torch.Tensor(knn_lm_logit), dim=-1).cpu().tolist()
-
-			y_true.append(target_ids.squeeze(0).cpu().tolist())
-			y_pred.append(y_lm_pred)
-			y_knn_lm_pred.append(y_knnlm_pred)
-
-
-	pk.dump({'lm_logits': lm_logits, 
-		'knn_logits': knn_logits,
-        'knn_lm_logits': knn_lm_logits, 
-		'ground_truth': y_true,
-        }, open(f"{args.dataset}_logits.pkl","wb"))
-
-	get_samples_classified_correctly_by_knnlm(test_datasets, y_true, y_pred, y_knn_lm_pred)
-
-	
-	labels = [i for i in range(num_labels)]
-	print("\n#num of under kl_threshold: ", knn_need_count, "\n")
-	print("================ LM only======================")
-	print(classification_report(y_true, y_pred, labels=labels, digits=4))
-	
-	lm_acc = compute_accuracy_(y_true, lm_logits)
-	print("lm-only acc:", lm_acc)
-	if True:
-		lm_macro_f1 = compute_macro_f1(y_true, lm_logits)
-		print("lm-only macro_f1:", lm_macro_f1)
-
-	print("================ KNN-LM ======================")
-	print(classification_report(y_true, y_knn_lm_pred, labels=labels, digits=4))
-	knn_lm_acc = compute_accuracy_(y_true, knn_lm_logits)
-	print("knn-lm acc", knn_lm_acc)
-	if True:
-		knn_macro_f1 = compute_macro_f1(y_true, knn_lm_logits)
-		print("knn macro_f1:", knn_macro_f1)
-	
-
-
-
 if __name__ == "__main__":
 
 	args = get_args()
@@ -615,7 +451,6 @@ if __name__ == "__main__":
 		print("\n\n\tLoading adapter...\n")
 		model.load_adapter(f"{args.adapter_path}")
 		model.set_active_adapters(f"{args.dataset}") # to deactivate use model.set_active_adapters(None)
-		# model.set_active_adapters(str(args.dataset.lower().split("2")[0]))
 
 	# print(model)
 
@@ -625,7 +460,7 @@ if __name__ == "__main__":
 	'''Load dataset'''
 	if args.dataset.lower() == "rotten_tomatoes":
 
-		infer = load_dataset("rotten_tomatoes", cache_dir="/data/yingting/Dataset/rotten_tomatoes/")
+		infer = load_dataset("rotten_tomatoes", cache_dir="./Dataset/rotten_tomatoes/")
 		infer = infer.rename_column("label", "labels")
 
 		tokenized_datasets = infer.map(tokenize, batched=True,
@@ -638,7 +473,7 @@ if __name__ == "__main__":
 
 	elif args.dataset.lower() == "trec":
 
-		infer = load_dataset("trec", cache_dir="/data/yingting/Dataset/trec/")
+		infer = load_dataset("trec", cache_dir="./Dataset/trec/")
 		infer['train'] = infer['train'].shuffle(seed=42)
 		dataset_tr_valid = infer['train'].train_test_split(test_size=0.1, shuffle=True, seed=100)
 		infer['train'] = dataset_tr_valid['train']
@@ -655,7 +490,7 @@ if __name__ == "__main__":
 
 	elif args.dataset.lower() == "anli3":
 
-		infer = load_dataset("anli", split=["train_r3","dev_r3","test_r3"], cache_dir="/data/yingting/Dataset/anli3/")
+		infer = load_dataset("anli", split=["train_r3","dev_r3","test_r3"], cache_dir="./Dataset/anli3/")
 		infer[0] = infer[0].rename_column("label", "labels")
 		infer[1] = infer[1].rename_column("label", "labels")
 		infer[2] = infer[2].rename_column("label", "labels")
@@ -665,7 +500,7 @@ if __name__ == "__main__":
 		test_datasets = infer[2].map(multi_input_tokenize, batched=True, remove_columns=infer[0].column_names, num_proc = args.num_proc)
 
 	elif args.dataset.lower() == "anli2":
-		infer = load_dataset("anli", split=["train_r2","dev_r2","test_r2"], cache_dir="/data/yingting/Dataset/anli2/")
+		infer = load_dataset("anli", split=["train_r2","dev_r2","test_r2"], cache_dir="./Dataset/anli2/")
 		infer[0] = infer[0].rename_column("label", "labels")
 		infer[1] = infer[1].rename_column("label", "labels")
 		infer[2] = infer[2].rename_column("label", "labels")
@@ -675,7 +510,7 @@ if __name__ == "__main__":
 		test_datasets = infer[2].map(multi_input_tokenize, batched=True, remove_columns=infer[0].column_names, num_proc = args.num_proc)
 
 	elif args.dataset.lower() == "anli1":
-		infer = load_dataset("anli", split=["train_r1","dev_r1","test_r1"], cache_dir="/data/yingting/Dataset/anli1/")
+		infer = load_dataset("anli", split=["train_r1","dev_r1","test_r1"], cache_dir="./Dataset/anli1/")
 		infer[0] = infer[0].rename_column("label", "labels")
 		infer[1] = infer[1].rename_column("label", "labels")
 		infer[2] = infer[2].rename_column("label", "labels")
@@ -688,7 +523,7 @@ if __name__ == "__main__":
 		num_of_labels = 3
 		id_2_label={0:"0", 1:"1", 2:"2"}
 
-		dataset = load_dataset("anli", cache_dir="/data/yingting/Dataset/anli/")
+		dataset = load_dataset("anli", cache_dir="./Dataset/anli/")
 		dataset = dataset.rename_column("label", "labels")
 		
 		dataset = dataset.map(multi_input_tokenize, batched=True, remove_columns=dataset["train_r2"].column_names)
@@ -699,7 +534,7 @@ if __name__ == "__main__":
 		test_datasets = torch.utils.data.ConcatDataset([dataset["test_r1"], dataset["test_r2"], dataset["test_r3"]])
 
 	elif args.dataset.lower() == "restaurant":
-		restaurant_file = "/data/yingting/Dataset/RLDS/Restaurants_Train_v2.csv"
+		restaurant_file = "./Dataset/RLDS/Restaurants_Train_v2.csv"
 		id_2_label={0:"conflict", 1:"negative", 2:"neutral", 3:"positive"}
 
 		train_datasets = RLDSDataset(restaurant_file, tokenizer, 80, id_2_label, "train")
@@ -707,7 +542,7 @@ if __name__ == "__main__":
 		test_datasets = RLDSDataset(restaurant_file, tokenizer, 80, id_2_label, "test")
 
 	elif args.dataset.lower() == "laptop":
-		laptop_file = "/data/yingting/Dataset/RLDS/Laptop_Train_v2.csv"
+		laptop_file = "./Dataset/RLDS/Laptop_Train_v2.csv"
 		id_2_label={0:"conflict", 1:"negative", 2:"neutral", 3:"positive"}
 
 		train_datasets = RLDSDataset(laptop_file, tokenizer, 90, id_2_label, "train")
@@ -715,7 +550,7 @@ if __name__ == "__main__":
 		test_datasets = RLDSDataset(laptop_file, tokenizer, 90, id_2_label, "test")
 
 	elif args.dataset.lower() == "device":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		id_2_label={0:"NEG", 1:"POS"}
 
@@ -724,7 +559,7 @@ if __name__ == "__main__":
 		test_datasets = DLRSDataset(root_dir, "device", tokenizer, 400, id_2_label, mode="test")
 
 	elif args.dataset.lower() == "service":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
 
@@ -733,7 +568,7 @@ if __name__ == "__main__":
 		test_datasets = DLRSDataset(root_dir, "service", tokenizer, 350, id_2_label, mode="test")
 
 	elif args.dataset.lower() == "rest":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
 
@@ -742,7 +577,7 @@ if __name__ == "__main__":
 		test_datasets = DLRSDataset(root_dir, "rest", tokenizer, 350, id_2_label, mode="test")
 
 	elif args.dataset.lower() == "new_laptop":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
 
@@ -751,7 +586,7 @@ if __name__ == "__main__":
 		test_datasets = DLRSDataset(root_dir, "laptop", tokenizer, 430, id_2_label, mode="test")
 
 	elif args.dataset.lower() == "rest2new_laptop":
-		root_dir = "/data/yingting/Dataset/DLRS/"
+		root_dir = "./Dataset/DLRS/"
 
 		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
 
@@ -772,10 +607,9 @@ if __name__ == "__main__":
 		train_datasets = train_datasets.rename_column("label", "labels")
 		test_datasets  = test_datasets.rename_column("label", "labels")
 
-		'''
 	elif args.dataset.lower() == "cb":
-		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="/data/yingting/Dataset/super_glue/cb/")
+		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="./Dataset/super_glue/cb/")
+		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="./Dataset/super_glue/cb/")
 		test_dataset = valid_dataset
 
 		train_dataset = train_dataset.rename_column("label", "labels")
@@ -786,20 +620,6 @@ if __name__ == "__main__":
 		train_datasets = train_dataset.map(cb_encode_batch, batched=True, remove_columns=train_dataset.column_names)
 		valid_datasets = valid_dataset.map(cb_encode_batch, batched=True, remove_columns=valid_dataset.column_names)
 		test_datasets  = test_dataset.map(cb_encode_batch, batched=True, remove_columns=test_dataset.column_names)
-	
-	elif args.dataset.lower() == "rte":
-		train_dataset = load_dataset('super_glue', 'rte', split='train', cache_dir="/data/yingting/Dataset/super_glue/rte/")
-		valid_dataset = load_dataset('super_glue', 'rte', split='validation', cache_dir="/data/yingting/Dataset/super_glue/rte/")
-		test_dataset = valid_dataset
-
-		train_dataset = train_dataset.rename_column("label", "labels")
-		valid_dataset = valid_dataset.rename_column("label", "labels")
-		test_dataset  = test_dataset.rename_column("label", "labels")
-
-		# Encode the input data
-		train_datasets = train_dataset.map(cb_encode_batch, batched=True, remove_columns=train_dataset.column_names)
-		valid_datasets = valid_dataset.map(cb_encode_batch, batched=True, remove_columns=valid_dataset.column_names)
-		test_datasets  = test_dataset.map(cb_encode_batch, batched=True, remove_columns=test_dataset.column_names)'''
 
 	else:
 		raise NotImplementedError
@@ -822,16 +642,6 @@ if __name__ == "__main__":
 	# get_test_acc(args, valid_datasets, index, args.num_labels, model)
 	get_test_acc(args, test_datasets, index, args.num_labels, model)
 
-	# for topn in args.topn:
-	# 	for lambda_ in args.lambdas:
-	# 		for kl_threshold in args.kl_thresholds:
-	# 			print("*"*60)
-	# 			print("\n top_n_neighbours: ", topn, " lambda: ", lambda_, " kl_threshold: ", kl_threshold,  " layer_id:", args.layer_id, "\n")
-	# 			print("*"*60)
-
-	# 			# get_test_acc(args, test_datasets, index, kl_threshold, lambda_, topn, args.num_labels, model)
-	# 			get_test_acc_(args, test_datasets, index, kl_threshold, lambda_, topn, args.num_labels, model)
-	
 
 
 

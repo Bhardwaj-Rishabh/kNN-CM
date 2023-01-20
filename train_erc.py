@@ -1,16 +1,11 @@
 
 import torch
-from datasets import load_dataset, load_metric
 import numpy as np
 from transformers import set_seed, TrainingArguments, AdapterTrainer, EvalPrediction
-from transformers import RobertaTokenizer, RobertaConfig, RobertaForSequenceClassification, RobertaModelWithHeads
-from transformers import TextClassificationPipeline
+from transformers import RobertaTokenizer, RobertaConfig, RobertaModelWithHeads
 
 from os.path import join
-from torch.utils.data import DataLoader
 
-import argparse
-from transformers.integrations import TensorBoardCallback
 from transformers import EarlyStoppingCallback, default_data_collator
 import logging
 logging.disable(logging.WARNING)
@@ -68,16 +63,6 @@ class ERCDataset(Dataset):
 			texts = dataset["test_texts"]
 			labels= dataset["test_labels"]
 
-		# if data_name == "iemocap":
-		# 	lab_mapA = {0:0, 1:1, 2:2, 3:3, 4:4, 5:5}
-		# 	lab1_to_lab2_mapA = lambda labels: [lab_mapA[lab] for lab in labels]
-		# 	new_labels= lab1_to_lab2_mapA(labels)
-		# else:
-		# 	new_labels = labels	
-		# lab_mapA = {0:0, 1:1, 2:2, 3:3, 5:5, 6:4}
-		# lab1_to_lab2_mapA = lambda labels: [lab_mapA[lab] for lab in labels]
-		# new_labels= lab1_to_lab2_mapA(labels)	
-		# new_labels = labels
 		self.classes = [0,1,2,3,4,5]
 		self.num_of_labels = len(self.classes)
 		# breakpoint()
@@ -114,8 +99,7 @@ def get_dataset(tokenizer, args):
 	dataset = {"train" : train_dataset,
 			"validation" : valid_dataset,
 			"test" : test_dataset}
-	# print(train_dataset[0])
-	# breakpoint()
+	
 	
 	return dataset, num_of_labels, id_2_label
 
@@ -138,7 +122,6 @@ if __name__ == "__main__":
 		learning_rate=args.lr,
 		num_train_epochs=args.epochs,
 		per_device_train_batch_size=args.batchsize,
-		# per_device_eval_batch_size=args.batchsize,
 		per_device_eval_batch_size=1,
 		logging_steps=100, #25
 		output_dir=args.output_path,

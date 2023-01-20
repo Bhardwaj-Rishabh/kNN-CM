@@ -6,6 +6,7 @@ from datasets import load_dataset, load_metric
 from transformers import TrainingArguments, AdapterTrainer, EvalPrediction
 from transformers import EarlyStoppingCallback, default_data_collator
 from sklearn.metrics import f1_score, classification_report
+from collections import defaultdict
 
 set_seed(1234)
 
@@ -28,7 +29,7 @@ def get_args():
 	args = parser.parse_args()
 
 	return args
-from collections import defaultdict
+
 def record_encode_batch(examples):
 	encoded = defaultdict(list)
 	for idx, passage, query, entities, answers in zip(
@@ -119,7 +120,7 @@ def multirc_encode_batch(examples):
 
 def get_dataset(data_name, tokenizer, args):
 	if data_name == "record":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 		# raw_datasets = raw_datasets.rename_column("label", "labels")
 
@@ -133,7 +134,7 @@ def get_dataset(data_name, tokenizer, args):
 				"validation" : raw_datasets["validation"],
 				"test" : raw_datasets["test"]}
 	elif data_name == "copa":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 
@@ -148,7 +149,7 @@ def get_dataset(data_name, tokenizer, args):
 				"test" : raw_datasets["test"]}
 
 	elif data_name == "multirc":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 
@@ -191,13 +192,11 @@ training_args = TrainingArguments(
 	num_train_epochs=args.epochs,
 	per_device_train_batch_size=args.batchsize,
 	per_device_eval_batch_size=args.batchsize,
-	# per_device_eval_batch_size=1,
 	logging_steps=100, #25
 	output_dir=args.output_path,
 	overwrite_output_dir=True,
 	load_best_model_at_end=True,
 	metric_for_best_model=args.metric4train,
-	# metric_for_best_model="macro_f1",
 	evaluation_strategy='steps',
 	save_strategy = "steps",
 	# max_steps=5000,
@@ -207,8 +206,6 @@ training_args = TrainingArguments(
 	logging_dir=log_path,
 	# The next line is important to ensure the dataset labels are properly passed to the model
 	remove_unused_columns=False,
-	#changed
-	# remove_unused_columns=True,
 )
 
 train_dataset = dataset["train"]
@@ -218,8 +215,6 @@ test_dataset = dataset["test"]
 def compute_f1(p: EvalPrediction):
 	if isinstance(p.predictions, tuple):
 		p.predictions = p.predictions[0]
-	print("====================p.predictions=====================")
-	print(p.predictions)
 	preds = np.argmax(p.predictions, axis=1)
 	print(classification_report( p.label_ids, preds, digits=4))
 	return {"f1": f1_score(p.label_ids, preds)}

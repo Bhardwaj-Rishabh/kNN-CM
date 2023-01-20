@@ -1,29 +1,17 @@
-#[script to construct datastores]
-
 import os
-import sys
-import time
-import itertools
 import numpy as np
 
 import torch
 from tqdm import tqdm
-# from transformers import GPT2LMHeadModel, GPT2TokenizerFast
-from transformers import set_seed, RobertaTokenizer, RobertaConfig, RobertaModelWithHeads, RobertaForSequenceClassification
+from transformers import set_seed, RobertaTokenizer, RobertaModelWithHeads
 
 import faiss
 import psutil
 
-from datasets import Dataset
 from datasets import load_dataset, load_metric
-from datasets import load_from_disk
-from datasets import concatenate_datasets
 
-from sklearn.metrics import classification_report, f1_score
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import classification_report
 from collections import Counter
-
-from scipy.special import softmax
 
 import argparse
 from scipy.special import rel_entr
@@ -165,10 +153,7 @@ def copa_metric(predictions, references):
 def get_test_acc(args, test_datasets, index, num_labels, model):
 	y_true = []
 	y_pred = []
-	# y_knn_lm_pred = []
 	lm_logits = []
-	# knn_logits = []
-	# knn_lm_logits = []
 	neighbours_matrix=[]
 	neighbour_labels_matrix=[]
 	neighbours_distance_matrix=[]
@@ -438,7 +423,7 @@ if __name__ == "__main__":
 
 	'''Load dataset'''
 	if data_name == "record":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 
 		num_of_labels = 2
@@ -452,7 +437,7 @@ if __name__ == "__main__":
 		test_datasets = raw_datasets["test"]
 
 	elif data_name == "copa":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 
@@ -467,7 +452,7 @@ if __name__ == "__main__":
 		test_datasets = raw_datasets["test"]
 
 	elif data_name == "multirc":
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_name}"
+		cache_path = f"./Dataset/super_glue/{data_name}"
 		raw_datasets = load_dataset("super_glue", data_name, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 
