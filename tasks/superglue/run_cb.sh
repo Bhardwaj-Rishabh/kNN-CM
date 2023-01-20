@@ -13,6 +13,6 @@ done
 # do
 # 	CUDA_VISIBLE_DEVICES=2 python knn_lm.py --split train --dataset cb \
 # 	--pad_to_max_length True --max_seq_length 220 \
-# 	--model_id roberta-base --dstore_path /data/yingting/Dataset/super_glue/cb/ \
+# 	--model_id roberta-base --dstore_path ./Dataset/super_glue/cb/ \
 #     --layer_id $layer_id --adapter_path ./save/saved_adapters_cb_tmp --num_labels 3 --use_adapter --create_dstore True
 # done

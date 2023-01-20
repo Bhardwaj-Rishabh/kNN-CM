@@ -1,5 +1,5 @@
 export IN_TASK_NAME=anli
-export DSTORE_PATH=/data/yingting/Dataset/$IN_TASK_NAME/dstore/
+export DSTORE_PATH=./Dataset/$IN_TASK_NAME/dstore/
 export OUT_TASK_NAME=axg
 
 for layer_id in 11 #0 1 2 3 4 5 6 7 8 9 10 11

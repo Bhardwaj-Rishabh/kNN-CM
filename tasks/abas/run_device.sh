@@ -4,6 +4,6 @@
 for layer_id in 11 #0 1 2 3 4 5 6 7 8 9 10 11
 do
 	CUDA_VISIBLE_DEVICES=3 python knn_lm.py --split train --dataset device \
-	--model_id roberta-base --dstore_path /data/yingting/Dataset/DLRS/dstore/ \
+	--model_id roberta-base --dstore_path ./Dataset/DLRS/dstore/ \
     --layer_id $layer_id --adapter_path ./save/saved_adapters_device --num_labels 2 --use_adapter #--create_dstore True
 done
