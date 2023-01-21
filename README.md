@@ -1,5 +1,9 @@
 # kNN-CM
 
+## Motivation
+Semi-parametric models exhibit the properties of both parametric and non-parametric modeling and have been shown to be effective in the next-word prediction language modeling task. However, there is a lack of studies on the text-discriminating properties of such models. We propose an inference-phase approach—k-Nearest Neighbor Classifier Model (kNN-CM)—that enhances the capacity of a pretrained parametric text classifier by incorporating a simple neighborhood search through the representation space of (memorized) training samples. The final class prediction of kNN-CM is based on the convex combination of probabilities obtained from kNN search
+and prediction of the classifier. Our experiments show consistent performance improvements on eight SuperGLUE tasks, three adversarial natural language inference (ANLI)datasets, 11 question-answering (QA) datasets, and two sentiment classification datasets.
+
 ## Set up
 
 ```python
@@ -21,7 +25,7 @@ conda install -c pytorch faiss-gpu
 ```
 
 ## Train
-### Train LM
+### Train CM
 ```python
 # train anli
 CUDA_VISIBLE_DEVICES=3 python train.py --dataset anli --lr 1e-4 --epochs 100 --batchsize 32 \
@@ -33,10 +37,10 @@ CUDA_VISIBLE_DEVICES=3 python train.py --dataset anli --lr 1e-4 --epochs 100 --b
 ```python
 # create anli datastore
 CUDA_VISIBLE_DEVICES=3 python knn_lm.py --split train --dataset anli \
-	  --model_id roberta-base --dstore_path /data/yingting/Dataset/anli/dstore/ \
-    --layer_id $layer_id --adapter_path ./save/saved_adapters_anli --num_labels 3 --use_adapter --create_dstore True 
+	  --model_id roberta-base --dstore_path ./Dataset/anli/dstore/ \
+    --layer_id 11 --adapter_path ./save/saved_adapters_anli --num_labels 3 --use_adapter --create_dstore True 
 ```
-### or can use .sh file
+### Or can use .sh file directly
 ```python
 # anli example
 bash tasks/anli/run_anli.sh
