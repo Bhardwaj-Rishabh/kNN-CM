@@ -477,7 +477,7 @@ logger = logging.getLogger(__name__)
 class SuperGlueDataset():
 	def __init__(self, tokenizer: AutoTokenizer, data_args) -> None:
 		super().__init__()
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_args.dataset}"
+		cache_path = f"./Dataset/super_glue/{data_args.dataset}"
 		raw_datasets = load_dataset("super_glue", data_args.dataset, cache_dir=cache_path)
 		self.tokenizer = tokenizer
 		self.data_args = data_args
@@ -806,7 +806,7 @@ class DataCollatorForMultipleChoice(DataCollatorMixin):
 
 class SuperGlueDatasetForRecord(SuperGlueDataset):
 	def __init__(self, tokenizer: AutoTokenizer, data_args) -> None:
-		cache_path = f"/data/yingting/Dataset/super_glue/{data_args.dataset}"
+		cache_path = f"./Dataset/super_glue/{data_args.dataset}"
 		raw_datasets = load_dataset("super_glue", data_args.dataset, cache_dir=cache_path)
 		self.tokenizer = tokenizer
 		self.data_args = data_args
@@ -991,7 +991,7 @@ if __name__ == "__main__":
 	'''
 		DLRS
 	'''
-	# root_dir = "/data/yingting/Dataset/DLRS/"
+	# root_dir = "./Dataset/DLRS/"
 
 	#Device
 	# train = DLRSDataset(root_dir, "device", tokenizer, 400, id_2_label={0:"NEG", 1:"NEU", 2:"POS"}, mode="train")
@@ -1041,7 +1041,7 @@ if __name__ == "__main__":
 		RLDS
 	'''
 
-	# data_path = "/data/yingting/Dataset/RLDS"
+	# data_path = "./Dataset/RLDS"
 
 	### Restaurants
 	# r_train_v2 = "Restaurants_Train_v2.csv"
