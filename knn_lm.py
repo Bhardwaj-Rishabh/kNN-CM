@@ -18,10 +18,12 @@ from collections import Counter
 
 import argparse
 from scipy.special import rel_entr
+from scipy.special import kl_div
 from preprocess import RLDSDataset, DLRSDataset, SuperGlueDataset
 
 import pickle as pk
 
+# set_seed(1314)
 set_seed(1234)
 import random
 random.seed(4)
@@ -43,9 +45,9 @@ def get_args():
 	parser.add_argument('--adapter_path', type=str, default="./saved_adapters/")
 	parser.add_argument('--num_proc', type=int, default=-1)
 	parser.add_argument('--num_labels', type=int, default=6)
-	parser.add_argument('--lambdas', type=list, default=[0.001]) #1e-3, 1e-2, 0.05, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
-	parser.add_argument('--topn', type=list, default=[2]) #1, 2, 4, 8, 16, 32, 64, 128, 256, 512
-	parser.add_argument('--kl_thresholds', type=list, default=[0.8]) #0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8
+	parser.add_argument('--lambdas', type=list, default=[0.5]) #1e-3, 1e-2, 0.05, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
+	parser.add_argument('--topn', type=list, default=[4]) #1, 2, 4, 8, 16, 32, 64, 128, 256, 512
+	parser.add_argument('--kl_thresholds', type=list, default=[10]) #0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8
 	parser.add_argument('--pad_to_max_length', type=bool, default=True)
 	parser.add_argument('--max_seq_length', type=int, default=128)
 
@@ -111,6 +113,8 @@ def get_activation(name):
 		activation[name] = output.detach()
 	return hook
 
+# def create_datastore(num_samples, hidden_dim, dstore_path, dataset_name, model, device):
+from scipy.special import softmax
 def create_datastore(args, num_samples, train_datasets, model):
 	'''Allocate datastore memory'''	
 	dstore_filename = args.dstore_path + args.dataset + "_dstore_" + str(args.layer_id)
@@ -140,13 +144,13 @@ def create_datastore(args, num_samples, train_datasets, model):
 
 	#store elements into datastore
 	for i in tqdm(range(0, num_samples)):
-		input_ids = train_datasets[i]['input_ids'].view(1,-1).to(model.device)
-		target_ids = train_datasets[i]['labels'].view(-1).to(model.device)
+		input_ids = torch.tensor(train_datasets[i]['input_ids']).view(1,-1).to(model.device)
+		target_ids = torch.tensor(train_datasets[i]['labels']).view(-1).to(model.device)
 
 		with torch.no_grad():
 			#obtain context context representations
 			if "attention_mask" in train_datasets[i].keys():
-				attention_mask = train_datasets[i]["attention_mask"].to(model.device)
+				attention_mask = torch.tensor(train_datasets[i]["attention_mask"]).to(model.device)
 			else:
 				attention_mask = None
 			#changed
@@ -187,19 +191,19 @@ def create_datastore(args, num_samples, train_datasets, model):
 	vector_dimension = hidden_dim
 
 	# Create the Flat L2 index
-	# index = faiss.IndexFlatL2(vector_dimension)
-	res = faiss.StandardGpuResources()
 	index = faiss.IndexFlatL2(vector_dimension)
-	gpu_index_flat = faiss.index_cpu_to_gpu(res, 0, index)
+	# res = faiss.StandardGpuResources()
+	# index = faiss.IndexFlatL2(vector_dimension)
+	# gpu_index_flat = faiss.index_cpu_to_gpu(res, 0, index)
 
 	# Add vectors to index. Embeddings can be Numpy arrays or torch tensors
-	# index.add(dstore_keys)
-	gpu_index_flat.add(dstore_keys)
+	index.add(dstore_keys)
+	# gpu_index_flat.add(dstore_keys)
 
 	index_name = "./indexs/" + args.dataset + "_index_layer" + str(args.layer_id)
 
-	# faiss.write_index(index, index_name)
-	faiss.write_index(gpu_index_flat, index_name)
+	faiss.write_index(index, index_name)
+	# faiss.write_index(gpu_index_flat, index_name)
 
 def faiss_read(dataset, layer_id):
 	# Read the index from disk
@@ -255,16 +259,7 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 	neighbour_labels_matrix=[]
 	neighbours_distance_matrix=[]
 
-	#create datastore
-	num_samples = len(test_datasets)
-	if args.dataset == "copa":
-		hidden_dim = model.config.hidden_size * 2
-	else:
-		hidden_dim = model.config.hidden_size
-
 	dstore_filename = args.dstore_path + args.dataset + "_dstore_" + str(args.layer_id)
-	# dstore_keys = np.memmap(dstore_filename + '_key_test.npy', dtype=np.float16, mode='w+', shape=(num_samples, hidden_dim))
-	# dstore_vals_label = np.memmap(dstore_filename + '_val_test_label.npy', dtype=np.int32, mode='w+', shape=(num_samples, 1))
 	
 	train_labels = np.memmap(dstore_filename + '_val.npy', dtype=np.int32, mode='r')
 	# method1
@@ -278,13 +273,10 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 			shape1 = 2
 		else:
 			shape1 = 1
-		# input_ids = test_datasets[i]['input_ids'].clone().detach().view(shape1,-1).to(model.device)
-		# target_ids = test_datasets[i]['labels'].clone().detach().view(-1).to(model.device)
-		#changed
 		input_ids = torch.tensor(test_datasets[i]['input_ids']).view(shape1,-1).to(model.device)
 		target_ids = torch.tensor(test_datasets[i]['labels']).view(-1).to(model.device)
 		if "attention_mask" in data.keys():
-			attention_mask = data["attention_mask"].to(model.device)
+			attention_mask = torch.tensor(data["attention_mask"]).to(model.device)
 		else:
 			attention_mask = None
 
@@ -304,11 +296,6 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 				embedding = activation[f'roberta.encoder.layer.{args.layer_id}.attention.output.LayerNorm'][:,0,:].reshape(1,-1).squeeze(0).cpu().numpy().astype(np.float16)
 			else:
 				embedding = activation[f'roberta.encoder.layer.{args.layer_id}.attention.output.LayerNorm'].squeeze(0)[0].cpu().numpy().astype(np.float16)
-
-			##### added for plt
-			# dstore_keys[i, :] = embedding # softmax(embedding, axis=-1)
-			# dstore_vals_label[i, ] = target_ids[0].cpu().numpy().astype(np.intc)
-			#######
 			
 			embedding = np.expand_dims(embedding, axis=0)
 			search_knnlm_start = time.time()
@@ -367,7 +354,8 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 					knn_logit = np.array(knn_logit)
 					knn_logits.append(knn_logit)
 
-					kl_divergence = sum(rel_entr(lm_logits[j], uniform_dis))
+					# kl_divergence = sum(rel_entr(lm_logits[j], uniform_dis))
+					kl_divergence = sum(kl_div(lm_logits[j], uniform_dis))
 						
 					if kl_divergence < kl_threshold :
 						knn_need_count += 1
@@ -400,7 +388,7 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 
 				lm_logits = np.stack(lm_logits,0)
 
-				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop"]:
+				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop", "rotten_tomatoes"]:
 					metrics = compute_accuracy(lm_logits, y_true)
 				else:
 					raise NotImplementedError
@@ -411,7 +399,7 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 				print(classification_report(y_true, y_knn_preds, digits=4))
 				knn_logits = np.stack(knn_logits,0)
 
-				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop"]:
+				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop", "rotten_tomatoes"]:
 					metrics = compute_accuracy(knn_logits, y_true)
 				else:
 					raise NotImplementedError
@@ -423,7 +411,7 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 				
 				knn_lm_logits = np.stack(knn_lm_logits,0)
 		
-				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop"]:
+				if args.dataset in ["anli", "anli1", "anli2", "anli3", "restaurant", "laptop", "rotten_tomatoes"]:
 					metrics = compute_accuracy(knn_lm_logits, y_true)
 					tmp["metrics"] = metrics["accuracy"]
 				else:
@@ -584,15 +572,6 @@ if __name__ == "__main__":
 		train_datasets = DLRSDataset(root_dir, "laptop", tokenizer, 430, id_2_label, mode="train")
 		valid_datasets = DLRSDataset(root_dir, "laptop", tokenizer, 430, id_2_label, mode="valid")
 		test_datasets = DLRSDataset(root_dir, "laptop", tokenizer, 430, id_2_label, mode="test")
-
-	elif args.dataset.lower() == "rest2new_laptop":
-		root_dir = "./Dataset/DLRS/"
-
-		id_2_label={0:"NEG", 1:"NEU", 2:"POS"}
-
-		train_datasets = DLRSDataset(root_dir, "rest", tokenizer, 350, id_2_label, mode="train")
-		valid_datasets = DLRSDataset(root_dir, "rest", tokenizer, 350, id_2_label, mode="valid")
-		test_datasets = DLRSDataset(root_dir, "laptop", tokenizer, 430, id_2_label, mode="test")
 	
 	elif args.dataset.lower() in SUPERGLUE:
 		dataset = SuperGlueDataset(tokenizer, args)
@@ -620,6 +599,7 @@ if __name__ == "__main__":
 		train_datasets = train_dataset.map(cb_encode_batch, batched=True, remove_columns=train_dataset.column_names)
 		valid_datasets = valid_dataset.map(cb_encode_batch, batched=True, remove_columns=valid_dataset.column_names)
 		test_datasets  = test_dataset.map(cb_encode_batch, batched=True, remove_columns=test_dataset.column_names)
+	
 
 	else:
 		raise NotImplementedError
@@ -641,7 +621,7 @@ if __name__ == "__main__":
 	'''Test Dataset Acc'''
 	# get_test_acc(args, valid_datasets, index, args.num_labels, model)
 	get_test_acc(args, test_datasets, index, args.num_labels, model)
-
+	
 
 
 
