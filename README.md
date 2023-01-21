@@ -38,7 +38,7 @@ CUDA_VISIBLE_DEVICES=3 python train.py --dataset anli --lr 1e-4 --epochs 100 --b
 # create anli datastore
 CUDA_VISIBLE_DEVICES=3 python knn_lm.py --split train --dataset anli \
 	  --model_id roberta-base --dstore_path ./Dataset/anli/dstore/ \
-    --layer_id $layer_id --adapter_path ./save/saved_adapters_anli --num_labels 3 --use_adapter --create_dstore True 
+    --layer_id 11 --adapter_path ./save/saved_adapters_anli --num_labels 3 --use_adapter --create_dstore True 
 ```
 ### Or can use .sh file directly
 ```python
