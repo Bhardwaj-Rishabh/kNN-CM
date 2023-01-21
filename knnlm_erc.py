@@ -16,6 +16,7 @@ from collections import Counter
 
 import argparse
 from scipy.special import rel_entr
+from scipy.special import kl_div
 
 from train_erc import ERCDataset
 
@@ -202,7 +203,8 @@ def get_test_acc(args, test_datasets, index, num_labels, model):
 					knn_logit = np.array(knn_logit)
 					knn_logits.append(knn_logit)
 
-					kl_divergence = sum(rel_entr(lm_logits[j], uniform_dis))
+					# kl_divergence = sum(rel_entr(lm_logits[j], uniform_dis))
+					kl_divergence = sum(kl_div(lm_logits[j], uniform_dis))
 						
 					if kl_divergence < kl_threshold :
 						knn_need_count += 1
