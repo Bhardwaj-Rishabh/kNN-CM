@@ -585,7 +585,7 @@ if __name__ == "__main__":
 
 	'''Load dataset'''
 	if out_dataset == "axg":
-		cache_path = f"/data/yingting/Dataset/super_glue/{out_dataset}"
+		cache_path = f"./Dataset/super_glue/{out_dataset}"
 		raw_datasets = load_dataset("super_glue", out_dataset, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 		print(raw_datasets)
@@ -596,7 +596,7 @@ if __name__ == "__main__":
 		train_datasets=None
 		test_datasets = raw_datasets["test"]
 	elif out_dataset == "axb":
-		cache_path = f"/data/yingting/Dataset/super_glue/{out_dataset}"
+		cache_path = f"./Dataset/super_glue/{out_dataset}"
 		raw_datasets = load_dataset("super_glue", out_dataset, cache_dir=cache_path)
 		raw_datasets = raw_datasets.rename_column("label", "labels")
 		print(raw_datasets)
@@ -607,9 +607,9 @@ if __name__ == "__main__":
 		train_datasets=None
 		test_datasets = raw_datasets["test"]
 	elif out_dataset == "cb":
-		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="/data/yingting/Dataset/super_glue/cb/")
-		test_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="/data/yingting/Dataset/super_glue/cb/")
+		train_dataset = load_dataset('super_glue', 'cb', split='train', cache_dir="./Dataset/super_glue/cb/")
+		valid_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="./Dataset/super_glue/cb/")
+		test_dataset = load_dataset('super_glue', 'cb', split='validation', cache_dir="./Dataset/super_glue/cb/")
 		
 		train_dataset = train_dataset.rename_column("label", "labels")
 		valid_dataset = valid_dataset.rename_column("label", "labels")
@@ -631,7 +631,7 @@ if __name__ == "__main__":
 		train_datasets = train_dataset
 		test_datasets = valid_dataset
 	elif out_dataset == "restaurant":
-		data_path = "/data/yingting/Dataset/RLDS"
+		data_path = "./Dataset/RLDS"
 		r_train_v2 = "Restaurants_Train_v2.csv"
 		restaurant_file = join(data_path, r_train_v2)
 
@@ -646,7 +646,7 @@ if __name__ == "__main__":
 		valid_datasets = valid_dataset
 		test_datasets = test_dataset
 	elif out_dataset == "laptop":
-		laptop_file = "/data/yingting/Dataset/RLDS/Laptop_Train_v2.csv"
+		laptop_file = "./Dataset/RLDS/Laptop_Train_v2.csv"
 		id_2_label={0:"conflict", 1:"negative", 2:"neutral", 3:"positive"}
 
 		train_datasets = RLDSDataset(laptop_file, tokenizer, 90, id_2_label, "train")
@@ -657,7 +657,7 @@ if __name__ == "__main__":
 		# num_of_labels = 3
 		# id_2_label={0:"0", 1:"1", 2:"2"}
 
-		dataset = load_dataset("anli", cache_dir="/data/yingting/Dataset/anli/")
+		dataset = load_dataset("anli", cache_dir="./Dataset/anli/")
 		dataset = dataset.rename_column("label", "labels")
 		
 		dataset = dataset.map(anli_encode_batch, batched=True, remove_columns=dataset["train_r2"].column_names)
